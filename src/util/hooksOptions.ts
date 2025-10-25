@@ -1,5 +1,0 @@
-export enum HooksOptions {
-  NO_HOOKS = 'NO_HOOKS',
-  HOOKS_ONLY = 'HOOKS_ONLY',
-  HOOKS_INCLUSIVE = 'HOOKS_INCLUSIVE',
-}
