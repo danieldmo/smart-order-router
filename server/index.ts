@@ -1,33 +1,37 @@
-require('dotenv').config();
-import { JsonRpcProvider } from '@ethersproject/providers';
+require("dotenv").config();
+import { JsonRpcProvider } from "@ethersproject/providers";
 import {
   ChainId,
   Currency,
   Percent,
   Token,
   TradeType,
-} from '@uniswap/sdk-core';
+} from "@uniswap/sdk-core";
 import {
   AlphaRouter,
   CurrencyAmount,
   SwapOptionsSwapRouter02,
+  SwapRoute,
   SwapType,
-} from '@uniswap/smart-order-router';
-import express from 'express';
+} from "@uniswap/smart-order-router";
+import express from "express";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS middleware
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || 'http://localhost:3000');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+    "Access-Control-Allow-Origin",
+    process.env.ALLOWED_ORIGINS || "http://localhost:3000"
+  );
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
 
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     res.sendStatus(200);
   } else {
     next();
@@ -39,11 +43,11 @@ app.use(express.json());
 
 // Native token names by chain ID
 const NATIVE_NAMES_BY_ID: { [chainId: number]: string[] } = {
-  [ChainId.MAINNET]: ['ETH'],
-  [ChainId.BASE]: ['ETH'],
-  [ChainId.POLYGON]: ['MATIC'],
-  [ChainId.ARBITRUM_ONE]: ['ETH'],
-  [ChainId.OPTIMISM]: ['ETH'],
+  [ChainId.MAINNET]: ["ETH"],
+  [ChainId.BASE]: ["ETH"],
+  [ChainId.POLYGON]: ["MATIC"],
+  [ChainId.ARBITRUM_ONE]: ["ETH"],
+  [ChainId.OPTIMISM]: ["ETH"],
 };
 
 // Helper function to get native currency for a chain
@@ -51,11 +55,11 @@ function nativeOnChain(chainId: ChainId): Currency {
   // For now, we'll create a token with the native address
   // This is a simplified approach - in production you'd want proper native currency handling
   const nativeAddresses: { [chainId: number]: string } = {
-    [ChainId.MAINNET]: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-    [ChainId.BASE]: '0x4200000000000000000000000000000000000006', // WETH
-    [ChainId.POLYGON]: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // WMATIC
-    [ChainId.ARBITRUM_ONE]: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', // WETH
-    [ChainId.OPTIMISM]: '0x4200000000000000000000000000000000000006', // WETH
+    [ChainId.MAINNET]: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
+    [ChainId.BASE]: "0x4200000000000000000000000000000000000006", // WETH
+    [ChainId.POLYGON]: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC
+    [ChainId.ARBITRUM_ONE]: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH
+    [ChainId.OPTIMISM]: "0x4200000000000000000000000000000000000006", // WETH
   };
 
   const nativeAddress = nativeAddresses[chainId];
@@ -72,12 +76,12 @@ function parseAmount(amount: string, currency: Currency): CurrencyAmount {
 }
 
 // Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get("/health", (_req, res) => {
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
 // Swap routing endpoint
-app.post('/swap-route', async (req, res): Promise<any> => {
+app.post("/swap-route", async (req, res): Promise<any> => {
   try {
     const {
       recipient,
@@ -95,18 +99,20 @@ app.post('/swap-route', async (req, res): Promise<any> => {
       debugRouting = true,
       enableFeeOnTransferFeeFetching = false,
       gasToken,
+      slippageTolerance = 50,
     } = req.body;
 
     // Log the incoming request
-    console.log('=== Swap Route Request ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('Chain ID:', chainId);
-    console.log('Token In:', tokenInAddress);
-    console.log('Token Out:', tokenOutAddress);
-    console.log('Amount In:', amountIn);
+    console.log("=== Swap Route Request ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("Chain ID:", chainId);
+    console.log("Token In:", tokenInAddress);
+    console.log("Token Out:", tokenOutAddress);
+    console.log("Amount In:", amountIn);
+    console.log("Slippage Tolerance:", slippageTolerance);
 
     if (!tokenInAddress || !tokenOutAddress || !amountIn) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+      return res.status(400).json({ error: "Missing required parameters" });
     }
 
     // Use environment variable for RPC URL if not provided
@@ -114,29 +120,29 @@ app.post('/swap-route', async (req, res): Promise<any> => {
       rpcUrl ||
       process.env.JSON_RPC_PROVIDER_BASE ||
       process.env.ALCHEMY_RPC_URL ||
-      'https://mainnet.base.org';
-    console.log('Environment variables check:');
+      "https://mainnet.base.org";
+    console.log("Environment variables check:");
     console.log(
-      '- JSON_RPC_PROVIDER_BASE:',
+      "- JSON_RPC_PROVIDER_BASE:",
       process.env.JSON_RPC_PROVIDER_BASE
     );
-    console.log('- ALCHEMY_RPC_URL:', process.env.ALCHEMY_RPC_URL);
-    console.log('- Using RPC URL:', finalRpcUrl);
+    console.log("- ALCHEMY_RPC_URL:", process.env.ALCHEMY_RPC_URL);
+    console.log("- Using RPC URL:", finalRpcUrl);
 
     if ((exactIn && exactOut) || (!exactIn && !exactOut)) {
       return res
         .status(400)
-        .json({ error: 'Must set either exactIn or exactOut' });
+        .json({ error: "Must set either exactIn or exactOut" });
     }
 
     const provider = new JsonRpcProvider(finalRpcUrl, chainId);
-    console.log('Provider created with chainId:', chainId);
+    console.log("Provider created with chainId:", chainId);
 
     const router = new AlphaRouter({
       chainId,
       provider,
     });
-    console.log('AlphaRouter created');
+    console.log("AlphaRouter created");
 
     // Skip protocol parsing for now to avoid JSBI issues
     const parsedProtocols: any[] = [];
@@ -148,42 +154,42 @@ app.post('/swap-route', async (req, res): Promise<any> => {
     // Check if tokens are native
     if (NATIVE_NAMES_BY_ID[chainId]?.includes(tokenInAddress)) {
       tokenIn = nativeOnChain(chainId);
-      console.log('Token In is native');
+      console.log("Token In is native");
     } else {
       tokenIn = new Token(chainId, tokenInAddress, tokenInDecimals || 18);
       console.log(
-        'Token In created:',
+        "Token In created:",
         tokenInAddress,
-        'decimals:',
+        "decimals:",
         tokenInDecimals || 18
       );
     }
 
     if (NATIVE_NAMES_BY_ID[chainId]?.includes(tokenOutAddress)) {
       tokenOut = nativeOnChain(chainId);
-      console.log('Token Out is native');
+      console.log("Token Out is native");
     } else {
       tokenOut = new Token(chainId, tokenOutAddress, tokenOutDecimals || 18);
       console.log(
-        'Token Out created:',
+        "Token Out created:",
         tokenOutAddress,
-        'decimals:',
+        "decimals:",
         tokenOutDecimals || 18
       );
     }
 
-    let swapRoutes;
+    let swapRoute: SwapRoute | null;
 
     if (exactIn) {
       const amountInParsed = parseAmount(amountIn.toString(), tokenIn);
-      console.log('Parsed amount in:', amountInParsed.toString());
+      console.log("Parsed amount in:", amountInParsed.toString());
 
       const options: SwapOptionsSwapRouter02 | undefined = recipient
         ? {
             type: SwapType.SWAP_ROUTER_02,
             deadline: Math.floor(Date.now() / 1000) + 1800, // 30 minutes
             recipient,
-            slippageTolerance: new Percent(50, 10000), // 0.5% slippage
+            slippageTolerance: new Percent(slippageTolerance, 10000), // 0.5% slippage
           }
         : undefined;
 
@@ -209,15 +215,15 @@ app.post('/swap-route', async (req, res): Promise<any> => {
         gasToken,
       };
 
-      console.log('Starting route calculation...');
-      swapRoutes = await router.route(
+      console.log("Starting route calculation...");
+      swapRoute = await router.route(
         amountInParsed,
         tokenOut,
         TradeType.EXACT_INPUT,
         options,
         routingOptions
       );
-      console.log('Route calculation completed');
+      console.log("Route calculation completed");
     } else {
       const amountOutParsed = parseAmount(amountIn.toString(), tokenOut);
 
@@ -252,21 +258,21 @@ app.post('/swap-route', async (req, res): Promise<any> => {
         gasToken,
       };
 
-      console.log('Starting route calculation (exact output)...');
-      swapRoutes = await router.route(
+      console.log("Starting route calculation (exact output)...");
+      swapRoute = await router.route(
         amountOutParsed,
         tokenIn,
         TradeType.EXACT_OUTPUT,
         options,
         routingOptions
       );
-      console.log('Route calculation completed');
+      console.log("Route calculation completed");
     }
 
-    if (!swapRoutes) {
+    if (!swapRoute) {
       return res.status(404).json({
         error:
-          'Could not find route. Try adjusting parameters or check token addresses.',
+          "Could not find route. Try adjusting parameters or check token addresses.",
       });
     }
 
@@ -279,14 +285,36 @@ app.post('/swap-route', async (req, res): Promise<any> => {
       gasPriceWei,
       methodParameters,
       quote,
+
       quoteGasAdjusted,
       route: routeAmounts,
       simulationStatus,
-    } = swapRoutes;
+      trade,
+    } = swapRoute;
+
+    console.log("---------", swapRoute.trade);
+    console.log("++++++", trade);
+    console.log("++++++", trade.swaps);
+    console.log("++++++", trade.routes);
+
+    console.log("amount", routeAmounts[0].amount.toExact());
+    console.log("percent", routeAmounts[0].percent);
+    console.log("rawQuote", routeAmounts[0].rawQuote.toString());
+    console.log("route", routeAmounts[0].route);
+    console.log("quote", routeAmounts[0].quote.toExact());
 
     res.json({
       success: true,
-      route: {
+      swapRoute,
+      summary: {
+        amountIn: swapRoute.trade.swaps[0].inputAmount.toExact(),
+        amountOut: swapRoute.trade.swaps[0].outputAmount.toExact(),
+        executionPrice: {
+          ...swapRoute.trade.executionPrice,
+          numerator: swapRoute.trade.executionPrice.numerator.toString(),
+          denominator: swapRoute.trade.executionPrice.denominator.toString(),
+        },
+        priceImpact: swapRoute.trade.priceImpact.toFixed(2) + "%",
         blockNumber,
         estimatedGasUsed,
         estimatedGasUsedQuoteToken,
@@ -299,13 +327,12 @@ app.post('/swap-route', async (req, res): Promise<any> => {
         routeAmounts,
         simulationStatus,
       },
-      amountOut: quote.toExact(),
     });
   } catch (error) {
-    console.error('Swap routing error:', error);
+    console.error("Swap routing error:", error);
     res.status(500).json({
-      error: 'Failed to generate swap route',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to generate swap route",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
